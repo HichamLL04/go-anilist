@@ -1,0 +1,30 @@
+{
+  "data": {
+    "Page": {
+      "pageInfo": {
+        "total": 1,
+        "perPage": 10,
+        "currentPage": 1,
+        "lastPage": 1,
+        "hasNextPage": false
+      },
+      "media": [
+        {
+          "id": 154587,
+          "idMal": 52991,
+          "title": {
+            "romaji": "Sousou no Frieren",
+            "english": "Frieren: Beyond Journey's End",
+            "native": "葬送のフリーレン"
+          },
+          "format": "TV",
+          "status": "FINISHED",
+          "episodes": 28,
+          "duration": 24,
+          "synonyms": ["Frieren at the Funeral"],
+          "seasonYear": 2023
+        }
+      ]
+    }
+  }
+}

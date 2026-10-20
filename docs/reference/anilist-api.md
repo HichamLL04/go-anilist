@@ -1,24 +1,24 @@
-﻿# Especificación de la API GraphQL de AniList (v2)
+# AniList GraphQL API (v2) Specification
 
-Documentación de referencia técnica sobre la API de AniList basada en
-la documentación oficial (https://docs.anilist.co) **[DOC-ANILIST]**.
+Technical reference documentation for the AniList GraphQL API based on the
+official documentation (https://docs.anilist.co) **[DOC-ANILIST]**.
 
 ---
 
-## 1. Endpoint y Protocolo HTTP
+## 1. HTTP Endpoint and Protocol
 
-- **Endpoint de producción**: `https://graphql.anilist.co` **[DOC-ANILIST]**
-- **Método**: Exclusivamente `POST`. Peticiones `GET` son rechazadas.
-- **Cabeceras obligatorias**:
+- **Production Endpoint**: `https://graphql.anilist.co` **[DOC-ANILIST]**
+- **Method**: Exclusively `POST`. `GET` requests are rejected.
+- **Mandatory Headers**:
   ```http
   Content-Type: application/json
   Accept: application/json
   ```
-- **Cabecera de autenticación** (cuando se requieren permisos de usuario):
+- **Authentication Header** (for user-authenticated queries and mutations):
   ```http
   Authorization: Bearer <access_token>
   ```
-- **Cuerpo de la petición**:
+- **Request Body Format**:
   ```json
   {
     "query": "query ($id: Int) { Media(id: $id) { id title { romaji english } } }",
@@ -28,18 +28,18 @@ la documentación oficial (https://docs.anilist.co) **[DOC-ANILIST]**.
 
 ---
 
-## 2. Autenticación y OAuth2
+## 2. Authentication and OAuth2
 
-AniList utiliza el protocolo OAuth 2.0 para autorizar el acceso y mutaciones en nombre del usuario **[DOC-ANILIST]**:
+AniList uses the OAuth 2.0 protocol for user authorization and mutations **[DOC-ANILIST]**:
 
 - **Authorize URL**: `https://anilist.co/api/v2/oauth/authorize`
 - **Token URL**: `https://anilist.co/api/v2/oauth/token`
 
-### Flujos soportados
+### Supported Grant Types
 
-1. **Authorization Code Grant** (Recomendado para servicios backend como aniSync):
-   - Redirección del usuario a `/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}`.
-   - Intercambio del `code` mediante POST a `/oauth/token` con payload:
+1. **Authorization Code Grant** (Recommended for automated backends like aniSync):
+   - Redirect user to `/oauth/authorize?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}`.
+   - Exchange code via POST to `/oauth/token`:
      ```json
      {
        "grant_type": "authorization_code",
@@ -49,42 +49,41 @@ AniList utiliza el protocolo OAuth 2.0 para autorizar el acceso y mutaciones en 
        "code": "{AUTHORIZATION_CODE}"
      }
      ```
-   - Devuelve `access_token`, `token_type: "Bearer"`, `expires_in` y `refresh_token`.
-2. **Implicit Grant** (Para tokens estáticos o entornos de un solo usuario):
-   - Redirección con `response_type=token`.
-   - Devuelve el token directamente en el fragmento hash de la URL (`#access_token=...`).
+   - Returns `access_token`, `token_type: "Bearer"`, `expires_in`, and `refresh_token`.
+2. **Implicit Grant** (For manual static tokens or single-user desktop utilities):
+   - Direct authorization returning token in URL hash fragment (`#access_token=...`).
 
-### Caducidad y validez de tokens
+### Token Expiration and Validity
 
-- Los tokens de acceso de AniList tienen típicamente una validez de **1 año (31.536.000 segundos)** **[DOC-ANILIST]**.
-- Cuando se utiliza Authorization Code Grant, el `refresh_token` permite obtener un nuevo `access_token` antes o después de la expiración sin requerir intervención manual del usuario.
-
----
-
-## 3. Rate Limiting (Límites de Cuota Reales)
-
-- **Límite general**: **90 peticiones por minuto** por IP o por token OAuth2 **[DOC-ANILIST]**.
-- Si se supera el límite, la API responde con código HTTP **`429 Too Many Requests`**.
-- **Cabeceras de respuesta HTTP**:
-  - `X-RateLimit-Limit`: Límite máximo de peticiones por minuto (típicamente `90`).
-  - `X-RateLimit-Remaining`: Peticiones disponibles en la ventana actual de 60 segundos.
-  - `X-RateLimit-Reset`: Timestamp UNIX (en segundos) en el que se reinicia el contador de cuota.
-  - `Retry-After`: En respuestas HTTP 429, indica los segundos enteros que el cliente debe esperar antes de reintentar.
+- AniList access tokens are typically valid for **1 year (31,536,000 seconds)** **[DOC-ANILIST]**.
+- When using the Authorization Code grant, the `refresh_token` allows automated renewal without requiring manual re-authentication.
 
 ---
 
-## 4. Gestión de Errores y Formato de Respuesta
+## 3. Rate Limiting (Actual Quotas)
 
-AniList devuelve respuestas estructuradas estándar de GraphQL **[DOC-ANILIST]**:
+- **General Quota**: **90 requests per minute** per IP or per OAuth2 token **[DOC-ANILIST]**.
+- When exceeding the quota, the API responds with HTTP **`429 Too Many Requests`**.
+- **HTTP Response Headers**:
+  - `X-RateLimit-Limit`: Maximum requests per window (typically `90`).
+  - `X-RateLimit-Remaining`: Remaining requests in current 60-second window.
+  - `X-RateLimit-Reset`: Unix timestamp (in seconds) when the rate limit window resets.
+  - `Retry-After`: In HTTP 429 responses, specifies the exact seconds to wait before retrying.
 
-### Respuesta exitosa
+---
+
+## 4. Error Handling and Response Envelope
+
+AniList returns standard GraphQL envelopes **[DOC-ANILIST]**:
+
+### Successful Response
 ```json
 {
   "data": { ... }
 }
 ```
 
-### Respuesta con errores
+### Error Response
 ```json
 {
   "errors": [
@@ -97,21 +96,21 @@ AniList devuelve respuestas estructuradas estándar de GraphQL **[DOC-ANILIST]**
 }
 ```
 
-### Códigos de estado HTTP devueltos por AniList
-- **200 OK**: Consulta ejecutada (incluso cuando ciertos campos parciales contengan errores en el array `errors`).
-- **400 Bad Request**: Error de validación de argumentos, sintaxis GraphQL inválida o violaciones de tipos.
-- **401 Unauthorized**: Token de acceso ausente, inválido o caducado.
-- **404 Not Found**: Recurso no encontrado (ej. `Media` con ID inexistente).
-- **429 Too Many Requests**: Límite de 90 peticiones por minuto excedido.
-- **500 / 502 / 503 Server Error**: Incidencia en los servidores de AniList o Cloudflare.
+### HTTP Status Codes
+- **200 OK**: Request completed (even if partial field errors exist in `errors`).
+- **400 Bad Request**: Invalid GraphQL syntax, variable validation failures, or type mismatches.
+- **401 Unauthorized**: Missing, invalid, or expired Bearer token.
+- **404 Not Found**: Resource not found (e.g. Media ID does not exist).
+- **429 Too Many Requests**: Rate limit of 90 requests/minute exceeded.
+- **500 / 502 / 503 Server Error**: AniList or upstream Cloudflare failure.
 
 ---
 
-## 5. Paginación en AniList
+## 5. Pagination
 
-- Toda consulta de colecciones utiliza el envoltorio `Page(page: $page, perPage: $perPage)` **[DOC-ANILIST]**.
-- **Restricción estricta**: El valor máximo de `perPage` permitido por la API es **50**. Solicitar más de 50 produce un error o un truncamiento automático a 50.
-- **Estructura de `pageInfo`**:
+- Collections are wrapped in `Page(page: $page, perPage: $perPage)` **[DOC-ANILIST]**.
+- **Strict Limit**: Maximum `perPage` allowed by the API is **50**.
+- **`pageInfo` Structure**:
   ```graphql
   pageInfo {
     total
@@ -124,19 +123,16 @@ AniList devuelve respuestas estructuradas estándar de GraphQL **[DOC-ANILIST]**
 
 ---
 
-## 6. Queries y Mutations Requeridas para aniSync
+## 6. Required Queries and Mutations for aniSync
 
-Para cumplir los requisitos de sincronización de aniSync, `go-anilist` debe cubrir exactamente las siguientes operaciones:
-
-### 1. Obtener usuario autenticado (`Viewer`)
-Permite conocer el `id`, nombre de usuario y opciones de listas del token configurado.
-
+### 1. Authenticated User (`Viewer`)
 ```graphql
 query CurrentUser {
   Viewer {
     id
     name
     avatar {
+      large
       medium
     }
     mediaListOptions {
@@ -146,13 +142,11 @@ query CurrentUser {
 }
 ```
 
-### 2. Búsqueda y consulta de Anime (`Media`)
-Permite identificar el anime a partir de títulos detectados en Plex (Romaji, Inglés, Nativo) o IDs cruzados (MyAnimeList).
-
+### 2. Anime Search and Lookup (`Media`)
 ```graphql
-query SearchAnime($search: String, $idMal: Int, $type: MediaType, $format: MediaFormat) {
-  Page(page: 1, perPage: 10) {
-    media(search: $search, idMal: $idMal, type: $type, format: $format) {
+query SearchAnime($search: String, $format: MediaFormat, $seasonYear: Int, $perPage: Int) {
+  Page(page: 1, perPage: $perPage) {
+    media(search: $search, format: $format, seasonYear: $seasonYear, type: ANIME) {
       id
       idMal
       title {
@@ -165,19 +159,13 @@ query SearchAnime($search: String, $idMal: Int, $type: MediaType, $format: Media
       episodes
       duration
       synonyms
-      startDate {
-        year
-        month
-        day
-      }
+      seasonYear
     }
   }
 }
 ```
 
-### 3. Consulta de entrada en la lista (`MediaList`)
-Verifica el estado actual de seguimiento de un anime concreto para el usuario autenticado.
-
+### 3. User Media List Entry (`MediaList`)
 ```graphql
 query GetMediaListEntry($userId: Int, $mediaId: Int) {
   MediaList(userId: $userId, mediaId: $mediaId, type: ANIME) {
@@ -192,9 +180,7 @@ query GetMediaListEntry($userId: Int, $mediaId: Int) {
 }
 ```
 
-### 4. Colección de listas de usuario (`MediaListCollection`)
-Obtiene la lista completa de seguimiento de un usuario de forma paginada/chunked para sincronización o verificación de biblioteca.
-
+### 4. User Collection (`MediaListCollection`)
 ```graphql
 query GetUserAnimeList($userId: Int, $status: MediaListStatus) {
   MediaListCollection(userId: $userId, type: ANIME, status: $status) {
@@ -225,9 +211,7 @@ query GetUserAnimeList($userId: Int, $status: MediaListStatus) {
 }
 ```
 
-### 5. Actualización / Creación de entrada (`SaveMediaListEntry`)
-Mutación principal para reportar progreso de visualización de episodios y estado (Watching, Completed).
-
+### 5. Update Watch Progress (`SaveMediaListEntry`)
 ```graphql
 mutation UpdateProgress(
   $mediaId: Int
@@ -254,7 +238,7 @@ mutation UpdateProgress(
 }
 ```
 
-### 6. Eliminación de entrada (`DeleteMediaListEntry`)
+### 6. Delete Entry (`DeleteMediaListEntry`)
 ```graphql
 mutation DeleteEntry($id: Int) {
   DeleteMediaListEntry(id: $id) {

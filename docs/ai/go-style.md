@@ -1,67 +1,66 @@
-﻿# Reglas de Estilo Go — go-anilist
+# Go Style Guidelines — go-anilist
 
-Guía de estilo y directrices técnicas obligatorias para cualquier código Go
-en la librería `go-anilist`.
-
----
-
-## 1. Manejo de errores
-
-- **Envolver siempre con `%w`**: Todos los errores propagados deben envolverse usando
-  `fmt.Errorf("anilist: <op>: %w", err)`. Nunca descartar errores con `_` en rutas
-  de ejecución crítica.
-- **Errores tipados y centinela**:
-  - Definir errores centinela para condiciones previsibles (ej. `ErrNotFound`, `ErrRateLimited`, `ErrUnauthorized`).
-  - Proporcionar un tipo estructurado `GraphQLError` y `ErrorResponse` que exponga los códigos de estado HTTP, mensajes devueltos por AniList y ubicaciones en la consulta GraphQL.
-  - Implementar métodos `errors.Is` / `errors.As` para permitir que el consumidor inspeccione la causa subyacente.
+Technical and code style standards for Go code in the `go-anilist` library.
 
 ---
 
-## 2. Contexto y cancelación
+## 1. Error Handling
 
-- **`context.Context` como primer parámetro**: En cualquier método o función que realice peticiones HTTP, I/O o cálculos asíncronos:
+- **Always wrap with `%w`**: All propagated errors must be wrapped using
+  `fmt.Errorf("anilist: <op>: %w", err)`. Never discard errors silently with `_`
+  in critical execution paths.
+- **Typed and Sentinel Errors**:
+  - Define sentinel errors for predictable conditions (e.g. `ErrNotFound`, `ErrRateLimited`, `ErrUnauthorized`).
+  - Provide structured types `GraphQLError` and `ErrorResponse` exposing HTTP status codes, AniList error messages, and query locations.
+  - Implement `errors.Is` / `errors.As` support so consumers can inspect underlying causes.
+
+---
+
+## 2. Context and Cancellation
+
+- **`context.Context` as First Parameter**: Any method or function performing HTTP, I/O, or asynchronous work must accept `ctx context.Context`:
   ```go
-  func (s *MediaService) Get(ctx context.Context, id int) (*Media, *Response, error)
+  func (s *MediaService) GetByID(ctx context.Context, id int) (*Media, *Response, error)
   ```
-- **Respetar cancelación**: Verificar `ctx.Err()` en operaciones en bucle y propagar el contexto a `http.Request.WithContext(ctx)`.
-- Si `ctx == nil`, rechazar la petición con un error explícito antes de emitir tráfico de red.
+- **Respect Cancellation**: Propagate the context to `http.NewRequestWithContext(ctx, ...)` and check `ctx.Err()`.
+- If `ctx == nil`, reject the request immediately with an error before initiating any network traffic.
 
 ---
 
-## 3. Estado, variables globales y funciones `init()`
+## 3. State, Global Variables, and `init()` Functions
 
-- **Prohibidas las variables globales mutables**: Cero estado mutable compartido. Cada instancia de `Client` gestiona su propia configuración, transporte y caché opcional.
-- **Sin `init()`**: No realizar registros mágicos en `init()`. La configuración debe ser explícita mediante opciones en `NewClient`.
-- Las constantes de endpoints y URLs deben ser inmutables.
+- **No Mutable Global Variables**: Zero shared mutable global state. Each `Client` instance manages its own configuration and HTTP transport independently.
+- **No `init()` Functions**: No hidden registration in `init()`. Configuration must be explicit via `NewClient` functional options.
+- Constants for endpoints and URLs must be immutable.
 
 ---
 
-## 4. Diseño de interfaces y API pública
+## 4. Interface and API Design
 
-- **Interfaces pequeñas y orientadas al consumidor**:
-  - `go-anilist` expone structs concretos para sus servicios (`MediaService`, `MediaListService`, etc.) y tipos de datos devueltos.
-  - No forzar interfaces gigantes en la librería; las interfaces se definen en el paquete consumidor (ej. en `aniSync` mediante la interfaz `Tracker`).
-- **Opciones funcionales tipadas**: Para parámetros opcionales y paginación, usar el patrón de opciones funcionales tipadas (ej. `Page(1)`, `PerPage(50)`, `Sort(MediaSortTitle)`).
-- **Inyección de dependencias**:
-  - El cliente debe aceptar un `*http.Client` preconfigurado:
+- **Small, Consumer-Driven Interfaces**:
+  - `go-anilist` exposes concrete structs for services (`MediaService`, `MediaListService`, etc.) and returned domain types.
+  - Do not force giant interfaces inside the library; interfaces should be defined by the consumer (e.g., in `aniSync` via its `Tracker` interface).
+- **Typed Functional Options**: Use typed functional options for optional parameters and filters (e.g., `WithFormat(MediaFormatTV)`, `WithLimit(10)`).
+- **Dependency Injection**:
+  - The client must accept an injected `*http.Client`:
     ```go
     func NewClient(httpClient *http.Client, opts ...ClientOption) *Client
     ```
-  - Si `httpClient` es `nil`, inicializar uno por defecto con timeouts razonables.
+  - If `httpClient == nil`, default to an `http.Client` with standard timeouts (30s).
 
 ---
 
-## 5. Estrategia de testing
+## 5. Testing Strategy
 
-- **Tests table-driven**: Uso de tablas de tests con subtests nombrados mediante `t.Run(tc.name, func(t *testing.T) { ... })`.
-- **Cero llamadas de red reales**: Los tests unitarios jamás deben depender de los servidores de AniList. Se debe emplear exclusivamente `net/http/httptest.Server` con fixtures JSON precargadas.
-- **Race detector**: Los tests deben pasar limpios con `go test -race ./...`.
+- **Table-Driven Tests**: Use test tables with named subtests via `t.Run(tc.name, func(t *testing.T) { ... })`.
+- **Zero Real Network Calls**: Unit tests must never depend on live AniList servers. Rely exclusively on `net/http/httptest.Server` and mock JSON fixtures.
+- **Race Detector**: All tests must pass cleanly under `go test -v -race ./...`.
 
 ---
 
-## 6. Build y compilación
+## 6. Build and Compilation
 
-- **`CGO_ENABLED=0`**: Todo el código debe compilar sin soporte CGO para garantizar binarios estáticos portables.
-- **Dependencias externas**:
-  - Minimizar dependencias. Preferir siempre la biblioteca estándar (`net/http`, `encoding/json`, `context`, `time`).
-  - No añadir clientes GraphQL pesados o librerías de terceros sin justificación documentada en `docs/design/graphql.md`.
+- **`CGO_ENABLED=0`**: All code must build cleanly without CGO for static portability.
+- **External Dependencies**:
+  - Keep dependencies to the absolute minimum. Always prefer the Go standard library (`net/http`, `encoding/json`, `context`, `time`).
+  - Do not add third-party GraphQL client libraries without formal justification in `docs/design/graphql.md`.

@@ -1,63 +1,60 @@
-﻿# Invariantes Arquitectónicos — go-anilist
+# Architectural Invariants — go-anilist
 
-Reglas e invariantes estructurales que deben respetarse en todo momento
-en el diseño e implementación de `go-anilist`.
-
----
-
-## 1. Independencia y desacoplamiento
-
-- **Totalmente agnóstica de aniSync**: `go-anilist` es una biblioteca autónoma.
-  Bajo ningún concepto debe importar paquetes de `aniSync`, hacer referencia a
-  Plex, SQLite, lógica de matching de biblioteca o webhooks.
-- **Sin estado global**: Múltiples instancias de `Client` deben poder coexistir
-  de forma concurrente y segura dentro del mismo proceso Go sin interferir
-  entre sí.
+Structural rules and invariants that must be upheld at all times in `go-anilist`.
 
 ---
 
-## 2. Separación de capas: Transporte GraphQL vs API Pública Tipada
+## 1. Independence and Decoupling
 
-1. **Capa de Transporte Interno (`internal/transport` o método privado `doGraphQL`)**:
-   - Encargada de serializar la petición GraphQL (`query`, `variables`).
-   - Envía la solicitud HTTP POST hacia `https://graphql.anilist.co`.
-   - Procesa los headers de rate limit (`X-RateLimit-*`).
-   - Deserializa el sobre estándar GraphQL:
+- **Completely Agnostic of aniSync**: `go-anilist` is an autonomous library.
+  Under no circumstances may it import `aniSync` packages, reference Plex, SQLite,
+  media matching algorithms, or webhook handlers.
+- **Zero Global State**: Multiple `Client` instances must be able to run concurrently
+  and safely within the same process without interference.
+
+---
+
+## 2. Layer Separation: GraphQL Transport vs Typed Public API
+
+1. **Internal Transport Layer (`doGraphQL`)**:
+   - Serializes GraphQL requests (`query`, `variables`).
+   - Sends HTTP POST requests to `https://graphql.anilist.co`.
+   - Parses AniList quota headers (`X-RateLimit-*`).
+   - Deserializes the standard GraphQL envelope:
      ```json
      {
        "data": { ... },
        "errors": [ ... ]
      }
      ```
-   - Normaliza errores HTTP y errores GraphQL en tipos Go enriquecidos.
+   - Normalizes HTTP status codes and GraphQL error arrays into enriched Go error types.
 
-2. **Capa de Servicios Públicos (`MediaService`, `MediaListService`, `UserService`, `AuthService`)**:
-   - Exponen métodos de alto nivel con nombres de dominio idiomáticos en Go:
+2. **Public Service Layer (`MediaService`, `MediaListService`, `UserService`, `AuthService`)**:
+   - Exposes high-level methods with idiomatic Go domain signatures:
      - `media.GetByID(ctx, id)`
      - `media.Search(ctx, query, opts...)`
-     - `mediaList.Get(ctx, userID, mediaID)`
-     - `mediaList.Save(ctx, entry, opts...)`
-   - Ocultan completamente los detalles sintácticos de las cadenas GraphQL y las mutaciones.
-   - Retornan modelos Go fuertemente tipados (`*Media`, `*MediaListEntry`, `*User`).
+     - `mediaList.GetEntry(ctx, userID, mediaID)`
+     - `mediaList.SaveEntry(ctx, input)`
+   - Completely encapsulates and hides raw GraphQL query strings and mutations.
+   - Returns strongly typed Go domain models (`*Media`, `*MediaListEntry`, `*User`).
 
 ---
 
-## 3. Manejo de Rate Limiting y Cuotas
+## 3. Rate Limiting and Quota Management
 
-- **Lectura estricta de headers**: La capa de transporte debe registrar los headers
-  `X-RateLimit-Limit`, `X-RateLimit-Remaining` y `X-RateLimit-Reset` en cada respuesta.
-- **Soporte de `Response` metadata**: Todo método público retorna `(*T, *Response, error)`
-  donde `Response` incluye los metadatos de rate limit para que el llamador (aniSync)
-  pueda planificar backoff o throttling inteligente.
-- **Respeto a HTTP 429**: Cuando la API devuelve 429 Too Many Requests, se debe extraer
-  el header `Retry-After` y retornar un error estructurado `RateLimitError`.
+- **Strict Header Inspection**: The transport layer extracts `X-RateLimit-Limit`,
+  `X-RateLimit-Remaining`, and `X-RateLimit-Reset` on every response.
+- **Response Metadata**: Public methods return `(*T, *Response, error)` where `Response`
+  includes rate limit metadata so consumers (like aniSync) can schedule intelligent throttling.
+- **HTTP 429 Compliance**: When receiving HTTP 429 Too Many Requests, extract `Retry-After`
+  and return structured `ErrRateLimited`.
 
 ---
 
-## 4. Inyección y ciclo de vida de `http.Client`
+## 4. `http.Client` Lifecycle and Injection
 
-- El cliente jamás creará instancias de transporte subyacentes que queden huérfanas.
-- Se debe soportar la inyección de `http.Client` personalizados, permitiendo:
-  - Autenticación OAuth2 delegada (ej. `golang.org/x/oauth2`).
-  - Proxies, middlewares de observabilidad o métricas.
-  - Servidores de pruebas `httptest.Server`.
+- The client must never leave orphaned HTTP transport resources.
+- Supports custom `http.Client` injection for:
+  - Delegated OAuth2 authentication.
+  - Proxies, metrics, or logging roundtrippers.
+  - Local testing servers with `httptest.Server`.

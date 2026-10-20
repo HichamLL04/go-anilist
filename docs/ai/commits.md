@@ -1,66 +1,64 @@
-﻿# Convención de Commits — go-anilist
+# Commit Convention — go-anilist
 
-Todos los commits de este repositorio deben cumplir estrictamente la especificación
-**Conventional Commits 1.0.0**.
+All commits in this repository must strictly follow the **Conventional Commits 1.0.0** specification.
 
 ---
 
-## 1. Estructura del commit
+## 1. Commit Structure
 
 ```
 <type>(<scope>)<!>: <description>
 
-[cuerpo opcional: líneas de ≤ 72 caracteres]
+[optional body: lines ≤ 72 characters]
 
-[pie(s) opcional(es): BREAKING CHANGE:, Refs:]
+[optional footer(s): BREAKING CHANGE:, Refs:]
 ```
 
-### Reglas obligatorias:
-- **type**: Uno de los tipos permitidos (en minúsculas).
-- **scope**: Obligatorio siempre que el cambio afecte a un subsistema concreto.
-- **description**: En inglés, modo imperativo ("add", "fix", "update", nunca "added" o "adds"), minúscula inicial, sin punto final, longitud máxima 72 caracteres.
-- **breaking change**: Indicar `!` inmediatamente tras el tipo/scope (ej. `feat(client)!: change auth signature`) y añadir `BREAKING CHANGE: <desc>` en el footer.
-- **atomicidad**: Un commit por cambio lógico. No acumular cambios no relacionados en un único commit masivo.
+### Mandatory Rules
+- **type**: One of the allowed types below (in lowercase).
+- **scope**: Mandatory whenever the change targets a specific subsystem.
+- **description**: In English, imperative mood ("add", "fix", "update", never "added" or "adds"), lowercase start, no trailing period, maximum 72 characters.
+- **breaking change**: Append `!` immediately after type/scope (e.g. `feat(client)!: change auth signature`) and include `BREAKING CHANGE: <desc>` in the footer.
+- **atomicity**: One commit per logical unit of work. Never bundle unrelated changes into a single monolithic commit.
 
 ---
 
-## 2. Tipos permitidos
+## 2. Allowed Types
 
-| Tipo | Propósito | Ejemplo de uso |
-|------|-----------|----------------|
-| `feat` | Nueva característica o función pública | Implementar servicio de MediaList |
-| `fix` | Corrección de un bug o comportamiento anómalo | Corregir parsing de errores GraphQL |
-| `docs` | Cambios exclusivos en documentación | Añadir especificación de API |
-| `style` | Formato, espacios, punto y coma (sin cambios de código) | Ajustar formato gofmt |
-| `refactor` | Refactorización de código sin cambiar comportamiento ni API | Simplificar decodificador interno |
-| `perf` | Optimización de rendimiento o asignaciones de memoria | Reutilizar buffers en JSON decoder |
-| `test` | Añadir o corregir tests unitarios | Añadir fixtures httptest para búsqueda |
-| `build` | Cambios en sistema de build o dependencias de tooling | Ajustar configuración de Go |
-| `ci` | Cambios en flujos de integración continua | Añadir workflow de GitHub Actions |
-| `chore` | Tareas de mantenimiento o configuración de repo | Inicializar gitignore o licencias |
-| `revert` | Reversión de un commit anterior | Revertir commit previo |
-
----
-
-## 3. Scopes comunes en go-anilist
-
-- `client`: Núcleo del cliente HTTP / GraphQL base.
-- `media`: Servicio de consulta y búsqueda de Media (Anime/Manga).
-- `medialist`: Servicio de consulta y actualización de listas de usuario.
-- `user`: Servicio de perfil de usuario y `Viewer`.
-- `auth`: Autenticación OAuth2 y gestión de tokens.
-- `graphql`: Motor de transporte GraphQL, generación de payload y parsing de errores.
-- `ratelimit`: Manejo de headers de cuota (`X-RateLimit-*`) y backoff.
-- `design`: Documentos de diseño de arquitectura.
-- `reference`: Documentos de análisis comparativo y especificaciones.
-- `ai`: Reglas y configuraciones para agentes IA.
-- `repo`: Configuración general del repositorio.
+| Type | Purpose | Example |
+|------|---------|---------|
+| `feat` | New public feature or method | Implement MediaListService |
+| `fix` | Bug fix or error handling correction | Fix GraphQL error array parsing |
+| `docs` | Documentation-only changes | Add API specification |
+| `style` | Formatting, whitespace (no code change) | Run gofmt on source files |
+| `refactor` | Refactoring code without altering public API | Simplify internal JSON decoder |
+| `perf` | Performance or memory allocation optimization | Reuse byte buffers in encoder |
+| `test` | Adding or updating unit tests | Add httptest search fixtures |
+| `build` | Build system or tooling dependencies | Adjust Go toolchain version |
+| `ci` | Continuous integration workflows | Add GitHub Actions test matrix |
+| `chore` | Maintenance tasks | Initialize .gitignore or licenses |
+| `revert` | Reverting a previous commit | Revert previous commit |
 
 ---
 
-## 4. Ejemplos de commits
+## 3. Common Scopes in go-anilist
 
-### Buenos ejemplos
+- `client`: Base HTTP / GraphQL client core.
+- `media`: Anime/media lookup and search service.
+- `medialist`: User tracking list query and mutation service.
+- `user`: User profile and Viewer service.
+- `auth`: OAuth2 token exchange and refresh service.
+- `graphql`: Internal GraphQL transport, payload encoding, error handling.
+- `design`: Architecture and design documentation.
+- `reference`: API specifications and reference analysis.
+- `ai`: Guidelines for AI agents.
+- `repo`: Repository metadata and configuration.
+
+---
+
+## 4. Commit Examples
+
+### Good Examples
 
 ```text
 docs(reference): document go-myanimelist design analysis and patterns
@@ -83,10 +81,10 @@ AniList returns HTTP 200 with top-level "errors" array when schema
 validation or field resolution fails.
 ```
 
-### Malos ejemplos (PROHIBIDOS)
+### Prohibited Examples (BAD)
 
-- ❌ `added some files`: No usa Conventional Commits, descripción en pasado.
-- ❌ `WIP`: Commits parciales sin mensaje descriptivo.
-- ❌ `docs: changes.`: Falta scope cuando aplica, contiene punto final.
-- ❌ `feat(client): Add new method and also update readme and fix bug`: No es atómico; mezcla 3 intenciones distintas.
-- ❌ `feat(client): implement huge client refactoring with all services`: Commit gigante monolítico.
+- ❌ `added some files`: Not Conventional Commits; past tense.
+- ❌ `WIP`: Incomplete, non-descriptive message.
+- ❌ `docs: changes.`: Missing scope when applicable; trailing period.
+- ❌ `feat(client): Add new method and also update readme and fix bug`: Not atomic; combines 3 separate concerns.
+- ❌ `feat(client): implement huge client refactoring with all services`: Giant monolithic commit.

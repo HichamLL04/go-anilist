@@ -1,12 +1,12 @@
-﻿# CLAUDE.md — go-anilist
+# CLAUDE.md — go-anilist
 
-Reglas de proyecto para asistentes Claude Code:
+Project rules for Claude Code assistants:
 
-Consulta [AGENTS.md](AGENTS.md) como la FUENTE ÚNICA de verdad sobre convenciones,
-estilo Go, diseño arquitectónico, límites de recursos y prohibiciones de este repositorio.
+Refer to [AGENTS.md](AGENTS.md) as the SINGLE SOURCE OF TRUTH for all repository
+rules, Go style conventions, architectural invariants, resource limits, and prohibitions.
 
-## Notas específicas para Claude Code
+## Specific notes for Claude Code
 
-- No ejecutes tests que dependan de conexión a internet; todo test debe utilizar mocks con `httptest.Server`.
-- Toda modificación debe documentarse y commitearse siguiendo Conventional Commits (ver [docs/ai/commits.md](docs/ai/commits.md)).
-- Antes de proponer una nueva dependencia, revisa [docs/design/graphql.md](docs/design/graphql.md).
+- Never run tests that require real internet connectivity; all tests must use local mocks via `httptest.Server`.
+- All modifications must follow Conventional Commits 1.0.0 (see [docs/ai/commits.md](docs/ai/commits.md)).
+- Before proposing any external dependency, review [docs/design/graphql.md](docs/design/graphql.md).

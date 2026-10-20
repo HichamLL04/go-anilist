@@ -1,29 +1,27 @@
-﻿# Estrategia de Testing — `go-anilist`
+# Testing Strategy — `go-anilist`
 
-Este documento describe la arquitectura y estándares de pruebas para `go-anilist`,
-asegurando suites deterministas, rápidas, aisladas y reproducibles sin conexión a red.
-
----
-
-## 1. Principios Fundamentales
-
-1. **Cero tráfico de red real**: Ningún test unitario debe conectarse a `https://graphql.anilist.co`. Todo tráfico se simula localmente.
-2. **Determinismo y velocidad**: La suite completa debe completarse en menos de 2 segundos en cualquier máquina de desarrollo o pipeline de CI.
-3. **Concurrencia segura**: Toda ejecución de tests debe superar el detector de condiciones de carrera de Go (`go test -race ./...`).
-4. **Validación bidireccional**: Los tests deben verificar tanto lo que el cliente *envía* (query GraphQL, variables, headers HTTP) como lo que el cliente *recibe y parsea* (tipos Go, errores enriquecidos, cuotas).
+This document defines testing standards for `go-anilist`, ensuring deterministic,
+fast, isolated, and reproducible test suites without external network access.
 
 ---
 
-## 2. Servidor de Prueba Local (`httptest.Server`)
+## 1. Core Testing Principles
 
-A diferencia de `go-myanimelist` (donde cada recurso tiene una URL REST distinta como `/anime/1` o `/users/@me`),
-en AniList GraphQL todas las peticiones se dirigen mediante `POST` a la raíz `/`.
+1. **Zero Real Network Traffic**: No unit test may connect to `https://graphql.anilist.co`. All network traffic is mocked locally.
+2. **Determinism and Speed**: The full suite must complete in less than 2 seconds.
+3. **Concurrency Safety**: All tests must pass cleanly under the Go race detector (`go test -v -race ./...`).
+4. **Bidirectional Verification**: Tests must verify both what the client *sends* (query, variables, HTTP headers) and what it *parses* (typed domain models, quota extraction, errors).
 
-Por ello, el multiplexor de tests debe inspeccionar el payload JSON:
+---
+
+## 2. Local Test Server (`httptest.Server`)
+
+Because AniList GraphQL dispatches all operations via HTTP `POST` to the root `/`,
+the mock server inspects the JSON payload:
 
 ```go
 type testMuxHandler struct {
-    handlers map[string]http.HandlerFunc // Clave: operationName o query match
+    handlers map[string]http.HandlerFunc
 }
 
 func setupTestServer(t *testing.T) (*Client, *testMuxHandler, func()) {
@@ -33,7 +31,6 @@ func setupTestServer(t *testing.T) (*Client, *testMuxHandler, func()) {
     }
 
     server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // 1. Validar método y cabeceras obligatorias
         if r.Method != http.MethodPost {
             http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
             return
@@ -43,7 +40,6 @@ func setupTestServer(t *testing.T) (*Client, *testMuxHandler, func()) {
             return
         }
 
-        // 2. Decodificar la petición GraphQL para saber qué operación se ejecuta
         var reqBody struct {
             Query         string                 `json:"query"`
             OperationName string                 `json:"operationName"`
@@ -54,12 +50,7 @@ func setupTestServer(t *testing.T) (*Client, *testMuxHandler, func()) {
             return
         }
 
-        // 3. Despachar al handler específico registrado
         opKey := reqBody.OperationName
-        if opKey == "" {
-            opKey = detectOperationKey(reqBody.Query)
-        }
-
         if handler, ok := muxHandler.handlers[opKey]; ok {
             handler(w, r)
             return
@@ -75,74 +66,23 @@ func setupTestServer(t *testing.T) (*Client, *testMuxHandler, func()) {
 
 ---
 
-## 3. Fixtures y Datos de Prueba (`testdata/`)
+## 3. Fixtures and Test Data (`testdata/`)
 
-Las respuestas simuladas se organizan en ficheros JSON estáticos dentro de `testdata/`:
+Mock JSON responses are kept in `testdata/`:
 
 ```
 testdata/
-  viewer_success.json              ← Respuesta a query Viewer
-  media_search_success.json        ← Búsqueda con 3 resultados y PageInfo
-  medialist_get_success.json       ← Entrada existente en lista
-  medialist_save_success.json      ← Mutación SaveMediaListEntry completada
-  error_graphql_validation.json    ← Array "errors" con status 400
-  error_rate_limited.json          ← Respuesta 429 con cabecera Retry-After
+  viewer_success.json            ← Viewer query response
+  media_search_success.json      ← Search query with media list and pageInfo
+  medialist_get_success.json     ← Existing media list entry
+  medialist_save_success.json    ← SaveMediaListEntry mutation response
 ```
 
-Se cargan en los tests mediante `os.ReadFile("testdata/...")` o variables string precompiladas.
+Loaded in unit tests via `os.ReadFile("testdata/...")`.
 
 ---
 
-## 4. Estructura de Tests Table-Driven
+## 4. Context Cancellation Testing
 
-Todos los casos de prueba deben estructurarse en tablas `tc`:
-
-```go
-func TestMediaService_Search(t *testing.T) {
-    cases := []struct {
-        name          string
-        query         string
-        opts          []SearchOption
-        mockStatus    int
-        mockHeaders   map[string]string
-        mockFixture   string
-        wantErr       error
-        wantCount     int
-        wantRemaining int
-    }{
-        {
-            name:          "successful anime search",
-            query:         "Frieren",
-            opts:          []SearchOption{WithFormat(MediaFormatTV)},
-            mockStatus:    http.StatusOK,
-            mockHeaders:   map[string]string{"X-RateLimit-Remaining": "85"},
-            mockFixture:   "testdata/media_search_success.json",
-            wantErr:       nil,
-            wantCount:     1,
-            wantRemaining: 85,
-        },
-        {
-            name:        "rate limited 429 response",
-            query:      "Attack on Titan",
-            mockStatus: http.StatusTooManyRequests,
-            mockHeaders: map[string]string{
-                "Retry-After": "45",
-            },
-            mockFixture: "testdata/error_rate_limited.json",
-            wantErr:     ErrRateLimited,
-        },
-    }
-
-    for _, tc := range cases {
-        t.Run(tc.name, func(t *testing.T) {
-            // Setup server, configure mock handler, execute method and assert
-        })
-    }
-}
-```
-
----
-
-## 5. Verificación de Cancelación de Contexto
-
-Cada servicio debe incluir tests explícitos que garanticen que un contexto cancelado (`context.Canceled` o `context.DeadlineExceeded`) interrumpe la petición de inmediato sin fugas de goroutines ni recursos de socket.
+Each service must verify that a cancelled `context.Context` (`context.Canceled` or
+`context.DeadlineExceeded`) immediately aborts the HTTP request without goroutine leaks.

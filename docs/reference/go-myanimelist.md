@@ -1,38 +1,38 @@
-﻿# Análisis de Referencia: `go-myanimelist`
+# Reference Analysis: `go-myanimelist`
 
-Este documento analiza en detalle la arquitectura, patrones y decisiones técnicas de
-la librería [`go-myanimelist`](https://github.com/nstratos/go-myanimelist)
-(autor: Stratos Neiros), utilizada como referencia de diseño para `go-anilist`.
+This document analyzes the architecture, design patterns, and engineering decisions of
+[`go-myanimelist`](https://github.com/nstratos/go-myanimelist) (author: Stratos Neiros),
+used as the primary reference design for `go-anilist`.
 
 ---
 
-## 1. Atribución y Licencia
+## 1. Attribution and License
 
-- **Licencia**: Licencia MIT **[DOC-GO]**.
+- **License**: MIT License **[DOC-GO]**.
   ```
   Copyright (c) 2015-present Stratos Neiros <nstratos@gmail.com>
   ```
-- **Condición**: La licencia MIT permite reutilizar la arquitectura, patrones y estructuras
-  derivadas siempre que se conserve el aviso de copyright y la nota de licencia correspondiente
-  en caso de reutilización directa de código.
+- **Attribution**: The MIT license allows reuse of patterns, client structures, and testing
+  methodologies provided that the copyright and permission notices are preserved.
 
 ---
 
-## 2. Estructura de Paquetes
+## 2. Package Structure
 
-- `go-myanimelist` organiza todo su núcleo en un único paquete principal (`mal`):
-  - `mal.go`: Define `Client`, `Response`, `ErrorResponse`, `Do()`, `NewRequest()`, helpers generales.
-  - `anime.go`, `manga.go`, `user.go`, `forum.go`: Servicios y modelos de dominio.
-  - `useranimelist.go`, `usermangalist.go`: Sub-recursos de listas de usuario.
-  - `*_test.go`: Tests unitarios y suite de integración.
-- **Evaluación**: Un solo paquete evita fragmentación innecesaria, problemas de importación
-  cíclica y jerarquías de paquetes redundantes en bibliotecas cliente Go de tamaño moderado.
+`go-myanimelist` organizes its entire core within a single root package (`mal`):
+- `mal.go`: Defines `Client`, `Response`, `ErrorResponse`, `Do()`, `NewRequest()`, and core helpers.
+- `anime.go`, `manga.go`, `user.go`, `forum.go`: Services and domain models.
+- `useranimelist.go`, `usermangalist.go`: Sub-resources for user tracking lists.
+- `*_test.go`: Unit tests and integration suite.
+
+**Evaluation**: A single root package prevents unnecessary fragmentation, import cycles,
+and redundant package hierarchies for moderate-sized Go client libraries.
 
 ---
 
-## 3. Patrón de Cliente y Servicios
+## 3. Client & Service Delegation Pattern
 
-El cliente actúa como contenedor central y delega en sub-servicios tipados:
+The client acts as the central coordinator and delegates to typed sub-services:
 
 ```go
 type Client struct {
@@ -58,15 +58,15 @@ func NewClient(httpClient *http.Client) *Client {
 }
 ```
 
-Cada servicio almacena una referencia no exportada a `client *Client`, lo que le permite
-acceder al método `c.Do(ctx, req, v)` y al transporte HTTP sin duplicar lógica de red.
+Each service stores an unexported back-reference to `client *Client`, allowing it to access
+`c.Do(ctx, req, v)` and shared HTTP transport without duplicating network logic.
 
 ---
 
-## 4. Opciones Funcionales Tipadas
+## 4. Typed Functional Options
 
-En lugar de listas largas de parámetros o structs de configuración repletas de punteros nil,
-`go-myanimelist` utiliza opciones funcionales basadas en interfaces:
+Rather than long parameter lists or config structs cluttered with nil pointers,
+`go-myanimelist` utilizes interface-based functional options:
 
 ```go
 type Option interface {
@@ -75,48 +75,33 @@ type Option interface {
 
 type Limit int
 func (l Limit) apply(v *url.Values) { v.Set("limit", strconv.Itoa(int(l))) }
-
-type Fields []string
-func (f Fields) apply(v *url.Values) {
-    if len(f) != 0 {
-        v.Set("fields", strings.Join(f, ","))
-    }
-}
 ```
 
-Para métodos específicos, crea interfaces especializadas (`AnimeListOption`, `UpdateMyAnimeListStatusOption`),
-lo que impide en tiempo de compilación pasar opciones no válidas a un método concreto.
+Specialized interfaces (`AnimeListOption`, `UpdateMyAnimeListStatusOption`) provide
+compile-time safety, preventing invalid options from being passed to specific methods.
 
 ---
 
-## 5. Autenticación
+## 5. Authentication
 
-- `go-myanimelist` no reinventa la rueda de OAuth2: delega la autenticación en
-  `golang.org/x/oauth2`.
-- El consumidor simplemente inicializa el cliente inyectando el `*http.Client` autenticado
-  proporcionado por `oauth2.Config.Client(ctx, token)`.
-- Esto separa limpiamente el ciclo de vida de los tokens (almacenamiento, refresh) de la lógica
-  propia del SDK.
+- Delegates OAuth2 token management to `golang.org/x/oauth2`.
+- Consumers initialize `Client` by passing an authenticated `*http.Client` produced by
+  `oauth2.Config.Client(ctx, token)`.
+- This cleanly separates token refresh and persistence from the API SDK logic.
 
 ---
 
-## 6. Paginación
+## 6. Pagination
 
-- Al ser una API REST, MyAnimeList devuelve enlaces absolutos en un objeto `Paging`:
-  ```json
-  "paging": {
-    "next": "https://api.myanimelist.net/v2/users/@me/animelist?offset=10&limit=10",
-    "previous": "..."
-  }
-  ```
-- `go-myanimelist` parsea el query parameter `offset` de esas URLs y expone `resp.NextOffset`
-  y `resp.PrevOffset` en el struct `Response`.
+- As a REST API, MyAnimeList returns absolute links in a `Paging` object with `next` and `previous`.
+- `go-myanimelist` parses the `offset` parameter from these URLs and exposes `NextOffset`
+  and `PrevOffset` on the `Response` struct.
 
 ---
 
-## 7. Manejo de Errores
+## 7. Error Handling
 
-- Define el struct `ErrorResponse`:
+- Defines `ErrorResponse` implementing `error`:
   ```go
   type ErrorResponse struct {
       Response *http.Response
@@ -124,15 +109,14 @@ lo que impide en tiempo de compilación pasar opciones no válidas a un método 
       Err      string `json:"error"`
   }
   ```
-- En `checkResponse`, si el código HTTP no está en el rango `200..299`, lee el cuerpo,
-  intenta deserializar el error JSON y devuelve `*ErrorResponse`.
-- Permite al usuario comprobar errores específicos con `errors.As(err, &errResp)`.
+- Evaluates HTTP status codes and parses JSON error bodies into structured types.
+- Supports inspection via `errors.As`.
 
 ---
 
-## 8. Estrategia de Testing
+## 8. Testing Strategy
 
-- Emplea `net/http/httptest.Server` para pruebas totalmente aisladas sin red:
+- Uses `net/http/httptest.Server` for isolated, offline unit tests:
   ```go
   func setup() (client *Client, mux *http.ServeMux, teardown func()) {
       mux = http.NewServeMux()
@@ -142,21 +126,20 @@ lo que impide en tiempo de compilación pasar opciones no válidas a un método 
       return client, mux, server.Close
   }
   ```
-- Funciones auxiliares de verificación: `testMethod`, `testURLValues`, `testBody`, `testErrorResponse`.
-- Respuestas de prueba almacenadas o inyectadas como strings JSON mock.
+- Helper functions: `testMethod`, `testURLValues`, `testBody`, `testErrorResponse`.
 
 ---
 
-## 9. Comparativa: Qué adoptar vs Qué NO copiar para `go-anilist`
+## 9. Comparison: What to Adopt vs What NOT to Copy for `go-anilist`
 
-| Patrón en `go-myanimelist` | ¿Adoptar en `go-anilist`? | Justificación técnica |
-|-----------------------------|---------------------------|-----------------------|
-| **Patrón Client / Services** | **SÍ** | Estructura modular idiomática en Go; agrupa métodos por entidad (`Media`, `MediaList`, `Viewer`). |
-| **Inyección de `*http.Client`** | **SÍ** | Permite inyectar autenticación OAuth2, rate limiters, proxies y servidores `httptest`. |
-| **Opciones funcionales tipadas** | **SÍ (adaptado)** | Excelente ergonomía; en vez de modificar `url.Values`, las opciones modificarán un mapa de `variables` GraphQL. |
-| **Struct `Response` enriquecido** | **SÍ** | Fundamental para exponer cabeceras `X-RateLimit-*` y cuotas de AniList al llamador. |
-| **Estrategia `httptest.Server`** | **SÍ (adaptado)** | Testing determinista sin dependencias externas ni conexión a internet. |
-| **Construcción de URLs REST (`url.Values`)** | **NO** | AniList es 100% GraphQL; todo tráfico va vía HTTP POST con JSON al endpoint raíz. |
-| **Paginación por offset en URLs** | **NO** | AniList utiliza GraphQL `Page(page: $page, perPage: $perPage)` y el objeto `PageInfo`. |
-| **Detección de errores sólo por HTTP Status** | **NO** | GraphQL puede devolver HTTP 200 con un array `"errors": [...]` en el cuerpo. El parser debe revisar siempre `errors`. |
-| **Muxing por URL path en tests** | **NO** | En AniList todas las peticiones apuntan a la misma ruta `/`; el handler de test debe inspeccionar `operationName` o variables en el body JSON. |
+| Pattern in `go-myanimelist` | Adopt in `go-anilist`? | Technical Justification |
+|-----------------------------|:----------------------:|-------------------------|
+| **Client / Services Pattern** | **YES** | Idiomatic Go structure; groups methods by entity (`Media`, `MediaList`, `Viewer`). |
+| **`*http.Client` Injection** | **YES** | Allows injecting OAuth2 tokens, custom proxies, and `httptest` servers. |
+| **Typed Functional Options** | **YES (adapted)** | Great ergonomics; instead of mutating `url.Values`, options set GraphQL variables. |
+| **Enriched `Response` Struct** | **YES** | Critical for exposing `X-RateLimit-*` quota headers to callers. |
+| **`httptest.Server` Strategy** | **YES (adapted)** | Fully deterministic testing without internet access. |
+| **REST URLs & `url.Values`** | **NO** | AniList is 100% GraphQL via HTTP POST to a single endpoint. |
+| **Offset URL Pagination** | **NO** | AniList uses `Page(page: $page, perPage: $perPage)` and `pageInfo`. |
+| **Errors Solely on HTTP Status** | **NO** | GraphQL can return HTTP 200 with top-level `errors` array in JSON. |
+| **URL Path Muxing in Tests** | **NO** | All requests hit `/`; test dispatchers must inspect JSON `query` or `operationName`. |

@@ -1,137 +1,135 @@
-﻿# AGENTS.md — go-anilist
+# AGENTS.md — go-anilist
 
-Fuente única de reglas para agentes de IA que trabajen en este repositorio.
-Lee este fichero completo antes de tocar cualquier código.
-
----
-
-## 1. Propósito del proyecto
-
-**go-anilist** es una librería Go cliente para la API GraphQL (v2) de AniList.
-Su objetivo es proporcionar un cliente tipado, idiomático, eficiente en memoria
-y con cero dependencias pesadas, para ser consumido primariamente por **aniSync**
-y por cualquier aplicación Go que requiera interactuar con AniList.
-
-La librería no implementa lógica de dominio de aniSync ni maneja webhooks de
-Plex; es una biblioteca cliente agnóstica e independiente.
+Single source of truth for AI agents working in this repository.
+Read this entire file before modifying any code or documentation.
 
 ---
 
-## 2. Mapa de `docs/`
+## 1. Project Purpose
+
+**go-anilist** is an idiomatic Go client library for the AniList GraphQL API (v2).
+Its goal is to provide a strongly typed, memory-efficient client with zero external
+dependencies, primarily consumed by **aniSync** and any Go application that requires
+interaction with AniList.
+
+This library does not implement aniSync domain logic, Plex webhook handling, or local
+database operations; it is a standalone, agnostic client library.
+
+---
+
+## 2. Map of `docs/`
 
 ```
 docs/
-  ai/                        ← reglas para agentes IA (este árbol)
-    commits.md               ← convención Conventional Commits + ejemplos
-    go-style.md              ← reglas de estilo Go
-    arquitectura-reglas.md   ← invariantes arquitectónicos de la librería
-    presupuesto-recursos.md  ← reglas de eficiencia y memoria
-    flujo-de-trabajo.md      ← flujo de trabajo paso a paso
+  ai/                        ← Rules for AI agents
+    commits.md               ← Conventional Commits 1.0.0 rules and examples
+    go-style.md              ← Go style guide and error wrapping rules
+    arquitectura-reglas.md   ← Library architectural invariants
+    presupuesto-recursos.md  ← Resource efficiency and memory budget rules
+    flujo-de-trabajo.md      ← Step-by-step agent workflow
   reference/
-    go-myanimelist.md        ← análisis de arquitectura de go-myanimelist
-    anilist-api.md           ← especificación y detalles de AniList GraphQL API
+    go-myanimelist.md        ← Architectural analysis of go-myanimelist
+    anilist-api.md           ← AniList GraphQL API technical specifications
   design/
-    alcance.md               ← alcance del subconjunto de AniList soportado
-    graphql.md               ← comparativa de enfoques GraphQL y justificación
-    api-publica.md           ← firmas y diseño de la API Go pública
-    testing.md               ← estrategia de testing con httptest y fixtures
-    versionado.md            ← política de SemVer y ciclo de releases
-  roadmap.md                 ← fases de implementación
-  preguntas-abiertas.md      ← dudas pendientes de resolución
+    alcance.md               ← Scope and bounded context of supported features
+    graphql.md               ← Evaluation of GraphQL integration approaches
+    api-publica.md           ← Exact Go public API contracts and signatures
+    testing.md               ← Deterministic testing strategy with httptest
+    versionado.md            ← SemVer policy and release lifecycle
+  roadmap.md                 ← Implementation roadmap and phases
+  preguntas-abiertas.md      ← Open architectural questions and pending decisions
 ```
 
 ---
 
-## 3. Comandos de build / test / lint
-
-> **TODO**: definir cuando exista código Go.
+## 3. Build / Test / Lint Commands
 
 ```bash
-# Compilar (cuando exista go.mod)
-# CGO_ENABLED=0 go build ./...
+# Compile library
+CGO_ENABLED=0 go build ./...
 
-# Tests unitarios (con race detector)
-# go test -race ./...
+# Run unit tests with race detection
+go test -v -race ./...
 
-# Lint estricto
-# golangci-lint run
+# Static analysis
+go vet ./...
 ```
 
 ---
 
-## 4. Reglas de estilo Go
+## 4. Go Style Rules
 
-Ver detalles en `docs/ai/go-style.md`. Resumen:
+See full details in `docs/ai/go-style.md`. Summary:
 
-- Errores siempre envueltos con `%w` (`fmt.Errorf("anilist: %s: %w", op, err)`).
-- `context.Context` como primer parámetro en toda función que realice I/O o HTTP.
-- Sin variables globales mutables ni `init()`.
-- Cliente configurable mediante constructor `NewClient(httpClient *http.Client, opts ...Option)`.
-- Opciones funcionales tipadas para filtros y mutaciones.
-- Tests table-driven con `t.Run` y uso exclusivo de `httptest.Server` (sin red en tests).
-- `CGO_ENABLED=0` estricto.
-- Prohibido introducir dependencias externas pesadas o clientes GraphQL de terceros sin evaluación justificada.
-
----
-
-## 5. Convención de commits
-
-Ver detalles y ejemplos en `docs/ai/commits.md`.
-
-Formato: `<type>(<scope>)<!>: <description>`
-
-- Tipos: `feat fix docs style refactor perf test build ci chore revert`
-- Scope obligatorio cuando aplique (ej. `docs(ref)`, `docs(design)`, `feat(client)`).
-- Descripción en inglés, imperativo, minúscula, sin punto, ≤ 72 chars.
-- Un commit por unidad lógica atómica. Nunca `--amend` ni `push --force`.
-- Nunca commitear secretos, tokens ni credenciales personales.
+- Errors must always be wrapped using `%w` (`fmt.Errorf("anilist: %s: %w", op, err)`).
+- `context.Context` must be the first parameter in all functions performing I/O or network calls.
+- No mutable global variables and no `init()` functions.
+- Client configured via functional options in `NewClient(httpClient *http.Client, opts ...ClientOption)`.
+- Table-driven unit tests using `t.Run` and exclusive use of `httptest.Server` (zero real-network calls in tests).
+- Strict `CGO_ENABLED=0` compatibility.
+- Zero external dependencies beyond the Go standard library.
 
 ---
 
-## 6. Presupuesto de recursos y memoria
+## 5. Commit Convention
 
-Ver `docs/ai/presupuesto-recursos.md`.
+See full details and examples in `docs/ai/commits.md`.
 
-- Librería ultraligera: sin dependencias externas innecesarias (`stdlib` + opcional rate limiter si se justifica).
-- Decodificación directa con `json.NewDecoder` hacia structs compactos.
-- No duplicar buffers ni retener respuestas completas en memoria si no se requiere.
-- Paginación estricta (máximo 50 elementos por página según API de AniList).
+Format: `<type>(<scope>)<!>: <description>`
 
----
-
-## 7. Etiquetas de procedencia
-
-Toda afirmación técnica en la documentación debe indicar su origen:
-
-| Etiqueta | Significado |
-|----------|-------------|
-| **[INFERIDO]** | Deducido del código fuente, tipos o contexto de uso |
-| **[RE]** | Medido o analizado con herramientas de ingeniería inversa / profiling |
-| **[DOC-GO]** | Extraído de la documentación oficial de Go o librerías estándar |
-| **[DOC-ANILIST]** | Extraído de la documentación oficial de AniList GraphQL v2 |
+- Allowed types: `feat fix docs style refactor perf test build ci chore revert`
+- Mandatory scope when applicable (e.g. `feat(client)`, `docs(design)`).
+- Description in English, imperative mode, lowercase, no trailing period, ≤ 72 characters.
+- Atomic commits per logical change. Never `--amend` or `push --force`.
+- Never commit secrets, tokens, or personal credentials.
 
 ---
 
-## 8. Cosas PROHIBIDAS
+## 6. Resource and Memory Budget
 
-- Acoplar `go-anilist` a conceptos de `aniSync` (Plex, webhooks, base de datos local).
-- Importar paquetes o lógica de `aniSync` en `go-anilist`.
-- Usar variables globales mutables o estado estático compartido.
-- Realizar peticiones HTTP reales a AniList en suites de tests (usar `httptest.Server`).
-- Hardcodear tokens OAuth2, client IDs, client secrets o credenciales de usuario.
-- Añadir dependencias externas sin justificación formal en `docs/design/`.
-- Ignorar o descartar la cancelación de `context.Context`.
-- Reescribir la historia de Git (`git commit --amend`, `git push --force`).
+See `docs/ai/presupuesto-recursos.md`.
+
+- Ultra-lightweight: zero external dependencies (`net/http`, `encoding/json`, `context`).
+- Streaming deserialization with `json.NewDecoder` directly on response bodies.
+- Do not duplicate buffers or retain raw HTTP responses in memory unnecessarily.
+- Strict pagination awareness (maximum 50 items per page enforced by AniList).
 
 ---
 
-## 9. Checklist "antes de dar una tarea por terminada"
+## 7. Provenance Tags
 
-- [ ] La documentación afectada está actualizada y sincronizada.
-- [ ] El código compila sin errores cuando aplique (`go build ./...`).
-- [ ] Los tests unitarios pasan sin red (`go test -race ./...`).
-- [ ] Todos los errores devueltos envuelven la causa con `%w`.
-- [ ] `context.Context` es el primer parámetro en llamadas con I/O.
-- [ ] No hay variables globales mutables ni dependencias no autorizadas.
-- [ ] No existen credenciales, tokens ni datos personales en el commit.
-- [ ] El commit sigue rigurosamente Conventional Commits 1.0.0.
+Technical assertions in documentation must specify their origin:
+
+| Tag | Meaning |
+|-----|---------|
+| **[INFERRED]** | Deduced from source code, types, or usage context |
+| **[RE]** | Measured or reverse-engineered via binary profiling |
+| **[DOC-GO]** | Extracted from official Go documentation or standard library docs |
+| **[DOC-ANILIST]** | Extracted from official AniList GraphQL v2 documentation |
+
+---
+
+## 8. Prohibited Actions
+
+- Coupling `go-anilist` to `aniSync` concepts (Plex, webhooks, SQLite, sync loops).
+- Importing `aniSync` packages or logic into `go-anilist`.
+- Using mutable global variables or shared static state.
+- Making real HTTP requests to AniList during unit tests (use `httptest.Server`).
+- Hardcoding OAuth2 tokens, client IDs, secrets, or personal credentials.
+- Adding third-party external dependencies without formal justification in `docs/design/`.
+- Ignoring or discarding `context.Context` cancellation.
+- Rewriting Git history (`git commit --amend`, `git push --force`) without explicit request.
+
+---
+
+## 9. Definition of Done Checklist
+
+- [ ] All affected documentation is up to date.
+- [ ] Code compiles without errors (`go build ./...`).
+- [ ] Unit tests pass cleanly with race detector (`go test -v -race ./...`).
+- [ ] `go vet ./...` reports 0 issues.
+- [ ] All returned errors wrap the underlying cause with `%w`.
+- [ ] `context.Context` is the first parameter in I/O operations.
+- [ ] No mutable global variables or unauthorized dependencies exist.
+- [ ] No secrets, tokens, or personal credentials are included.
+- [ ] Commits strictly follow Conventional Commits 1.0.0.

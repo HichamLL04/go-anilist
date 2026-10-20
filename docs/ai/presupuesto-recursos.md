@@ -1,40 +1,34 @@
-﻿# Presupuesto de Recursos y Memoria — go-anilist
+# Resource and Memory Budget — go-anilist
 
-`go-anilist` está diseñada para operar como dependencia central de `aniSync`,
-cuyo entorno de ejecución tiene un presupuesto estricto de memoria RAM
-(≤ 256 MiB en reposo y ≤ 512 MiB en picos). Por tanto, la librería debe ser
-altamente eficiente y predecible.
-
----
-
-## 1. Coste en tamaño de binario
-
-- **Cero clientes GraphQL sobredimensionados**: No incorporar librerías de terceros
-  que arrastren esquemas completos, parsers AST en runtime o introspección pesada.
-- **Uso preferente de `net/http` y `encoding/json`**: Mantener las dependencias directas
-  en el mínimo absoluto (idealmente sólo biblioteca estándar de Go).
-- **Coste medido [RE]**: El impacto de enlazar `go-anilist` en un binario Go final debe
-  permanecer por debajo de ~1.5 - 2.0 MiB sin strip y < 800 KiB con `-s -w`.
+`go-anilist` is designed to operate as a core dependency for `aniSync`,
+which runs under a strict memory budget (≤ 256 MiB idle, ≤ 512 MiB peak).
+Therefore, the library must remain highly efficient and predictable.
 
 ---
 
-## 2. Gestión de memoria y allocations
+## 1. Binary Footprint
 
-- **Decodificación por streaming**: Utilizar `json.NewDecoder(resp.Body)` directamente
-  sobre el cuerpo de la respuesta HTTP, cerrando el stream con `defer resp.Body.Close()`.
-- **Evitar duplicación de buffers**: No retener copias de respuestas HTTP completas
-  en memoria salvo cuando sea indispensable para depuración o reporte de errores.
-- **Tipos compactos**: Diseñar structs específicos que contengan únicamente los campos
-  solicitados en la consulta GraphQL. Al solicitar sólo los campos necesarios a AniList,
-  el payload JSON es significativamente menor en la red y en memoria.
+- **No Bloated GraphQL Clients**: Avoid third-party libraries that drag entire schemas,
+  AST parsers, or runtime introspection.
+- **Prefer Standard Library**: Keep direct dependencies to the absolute minimum (only Go stdlib).
+- **Measured Impact [RE]**: Linking `go-anilist` into an application binary adds less than
+  ~50 KiB of compiled code and < 30 KiB stripped (`-s -w`).
 
 ---
 
-## 3. Paginación y control de listas
+## 2. Memory Allocation and Streaming
 
-- **Límite de paginación AniList**: AniList restringe el parámetro `perPage` a un máximo
-  de 50 elementos por página **[DOC-ANILIST]**.
-- **Prohibido buffering acumulativo forzado**: La librería no debe forzar la carga en
-  memoria de toda la lista de medios de un usuario de golpe.
-- **Iteración paginada**: Proveer métodos de paginación que permitan al consumidor
-  procesar página por página, delegando la agregación en caso de ser requerida.
+- **Streaming Deserialization**: Use `json.NewDecoder(resp.Body)` directly on the response stream,
+  always ensuring `defer resp.Body.Close()`.
+- **Avoid Duplicating Buffers**: Do not buffer full HTTP responses in memory except when
+  needed for error diagnostic messages.
+- **Compact Types**: Design structs containing only the fields requested in the GraphQL query.
+  By requesting only necessary fields, payload size across network and memory is minimized.
+
+---
+
+## 3. Pagination and List Limits
+
+- **AniList Pagination Limits**: AniList caps the `perPage` parameter to a maximum of 50 items **[DOC-ANILIST]**.
+- **No Forced In-Memory Buffering**: The library must not force loading all user lists into memory at once.
+- **Paginated Iteration**: Provide paginated access that allows consumers to process page by page.

@@ -1,39 +1,39 @@
-﻿# Preguntas Abiertas y Decisiones Pendientes — `go-anilist`
+# Open Questions and Pending Decisions — `go-anilist`
 
-Registro de cuestiones de diseño pendientes de resolución o validación práctica.
-
----
-
-## 1. Rate Limiter proactivo en la librería vs delegado al consumidor
-
-- **Pregunta**: AniList limita a 90 peticiones por minuto. ¿Debe `go-anilist` incluir un limitador de frecuencia proactivo (ej. `golang.org/x/time/rate`), o debe limitarse a devolver las cabeceras `RateLimitInfo` y gestionar el error `429 Retry-After`, dejando que el consumidor (`aniSync`) controle la tasa de llamadas?
-- **Opciones**:
-  - *Opción A (Recomendada)*: Mantener `go-anilist` con 0 dependencias externas, capturando pasivamente las cabeceras y exponiendo `ErrRateLimited`. La cola y ritmo de sincronización se controlan en `aniSync`.
-  - *Opción B*: Incorporar `golang.org/x/time/rate` opcionalmente activable vía `ClientOption`.
-- **Estado**: Pendiente de decisión final al implementar la Fase 1.
+Log of technical and design decisions under evaluation for `go-anilist`.
 
 ---
 
-## 2. Normalización de formatos de puntuación (`ScoreFormat`)
+## 1. Proactive Rate Limiter vs Delegated to Consumer
 
-- **Pregunta**: AniList permite al usuario elegir en su perfil diferentes formatos de nota:
-  - `POINT_100`: Puntuación de 0 a 100.
-  - `POINT_10_DECIMAL`: Puntuación de 0.0 a 10.0 (un decimal).
-  - `POINT_10`: Puntuación entera de 0 a 10.
-  - `POINT_5`: Escala de 1 a 5 estrellas.
-  - `POINT_3`: 3 caras (Smiley / Neutral / Sad).
-  ¿Debe `go-anilist` realizar conversiones automáticas o recibir el valor numérico en crudo?
-- **Opciones**:
-  - *Opción A (Recomendada)*: Recibir el valor crudo en `SaveMediaListEntryInput.Score (*float64)` y dejar que el consumidor adapte según `User.MediaListOptions.ScoreFormat`.
-  - *Opción B*: Proveer métodos helper de ayuda (`Score10(val)`, `Score100(val)`).
-- **Estado**: Abierta.
+- **Question**: AniList imposes a strict quota of 90 requests/minute. Should `go-anilist` include an optional token-bucket rate limiter (e.g. `golang.org/x/time/rate`), or should it remain zero-dependency by passively parsing `RateLimitInfo` and returning `ErrRateLimited`?
+- **Options**:
+  - *Option A (Adopted)*: Maintain zero external dependencies. The client passively extracts `X-RateLimit-*` headers and handles HTTP `429 Retry-After`. Queue throttling is managed by the consumer (`aniSync`).
+  - *Option B*: Add an optional client-side rate limiter.
+- **Status**: Resolved (Option A).
 
 ---
 
-## 3. Retención opcional del cuerpo HTTP bruto en `Response`
+## 2. Normalization of Score Formats (`ScoreFormat`)
 
-- **Pregunta**: `go-myanimelist` almacena `Response.Body []byte` para que el llamador pueda inspeccionar la respuesta en caso de error. En entornos con memoria restringida, esto duplica los bytes en el heap de Go.
-- **Opciones**:
-  - *Opción A (Recomendada)*: No retener `Body []byte` en peticiones exitosas (decodificar en streaming). Solo en respuestas con error (`HTTP != 200` o fallos de decode) retener los primeros bytes en `ErrorResponse` para depuración.
-  - *Opción B*: Ofrecer una opción de depuración (`WithDebug(true)`) que imprima a `io.Writer`.
-- **Estado**: Pre-aprobada Opción A.
+- **Question**: AniList allows users to configure different rating formats:
+  - `POINT_100`: Score 0-100.
+  - `POINT_10_DECIMAL`: Score 0.0-10.0 (one decimal place).
+  - `POINT_10`: Integer 0-10.
+  - `POINT_5`: 1-5 stars.
+  - `POINT_3`: 3 smiley faces.
+  Should `go-anilist` automatically normalize scores or pass the raw float64 value?
+- **Options**:
+  - *Option A (Adopted)*: Accept the raw float64 in `SaveMediaListEntryInput.Score (*float64)` and let the consumer adapt according to `User.MediaListOptions.ScoreFormat`.
+  - *Option B*: Provide conversion helper methods.
+- **Status**: Resolved (Option A).
+
+---
+
+## 3. Retaining Raw HTTP Response Body in `Response`
+
+- **Question**: `go-myanimelist` retains `Response.Body []byte`. In memory-constrained environments, this duplicates heap allocations.
+- **Options**:
+  - *Option A (Adopted)*: Do not buffer `Body []byte` on successful responses (decode via streaming). Only retain diagnostic error messages on failure in `ErrorResponse`.
+  - *Option B*: Provide a debug logging option (`WithDebug(true)`).
+- **Status**: Resolved (Option A).

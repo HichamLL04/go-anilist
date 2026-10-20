@@ -1,46 +1,45 @@
-﻿# Alcance y Límites de la Librería — `go-anilist`
+# Library Scope and Boundaries — `go-anilist`
 
-Este documento define con precisión el perímetro funcional de `go-anilist`.
-La librería **no** pretende modelar la totalidad del esquema GraphQL de AniList,
-sino cubrir de manera óptima y especializada las necesidades de **aniSync** y
-herramientas afines de sincronización de medios.
-
----
-
-## 1. Principio de Delimitación
-
-El esquema oficial de AniList v2 contiene cientos de tipos, interfaces y uniones
-(incluyendo foros, transacciones, feeds sociales, reseñas y actores de doblaje).
-Implementar un cliente universal supondría:
-- Multiplicar el tamaño del binario y el tiempo de compilación.
-- Aumentar las allocations de memoria en runtime sin aportar valor.
-- Generar una carga de mantenimiento desproporcionada.
-
-Por ello, `go-anilist` aplica una estrategia de **alcance mínimo viable estricto**,
-centrándose en el ciclo de vida de búsqueda, consulta y sincronización de progreso de anime.
+This document defines the functional perimeter of `go-anilist`.
+The library does **not** attempt to cover the entirety of AniList's schema,
+focusing strictly on the needs of **aniSync** and media tracking tools.
 
 ---
 
-## 2. Componentes DENTRO del Alcance
+## 1. Boundary Principle
 
-| Componente / Servicio | Métodos y Entidades | Justificación técnica en aniSync |
-|-----------------------|---------------------|-----------------------------------|
-| **Auth / OAuth2** | `AuthorizeURL`, `ExchangeCode`, `RefreshToken` | Permite vincular la cuenta de AniList del usuario de forma desatendida y persistente. |
-| **User (`UserService`)** | `Viewer(ctx)`, `GetByID(ctx, id)` | Permite identificar al usuario autenticado, su ID numérico y sus preferencias de lista (sistema de puntuación: 10, 100, 5 estrellas). |
-| **Media (`MediaService`)** | `GetByID(ctx, id)`, `GetByIDMal(ctx, idMal)`, `Search(ctx, query, opts...)` | Permite mapear los títulos detectados en Plex (Romaji, Inglés, Nativo) y correlacionar con IDs de MyAnimeList. Incluye conteo de episodios y formato (TV, Movie, OVA, etc.). |
-| **MediaList (`MediaListService`)** | `GetEntry(ctx, userID, mediaID)`, `GetCollection(ctx, userID, opts...)`, `SaveEntry(ctx, input)`, `DeleteEntry(ctx, id)` | Núcleo de sincronización: leer si el usuario ya está viendo el anime, su progreso actual, y mutar el episodio visto y estado (`CURRENT`, `COMPLETED`). |
-| **Transporte & Cuotas** | `DoGraphQL`, lectura de cabeceras `X-RateLimit-*`, manejo de error 429 | Garantiza no exceder el límite de 90 peticiones/minuto de AniList y reportar cuota a aniSync. |
+The official AniList v2 GraphQL schema contains hundreds of types (including forum threads,
+social feeds, community reviews, character voice actors, and moderation logs).
+Building a universal client would:
+- Multiply compiled binary size and build times.
+- Increase runtime allocations with zero added value.
+- Introduce an unmanageable maintenance burden.
+
+Therefore, `go-anilist` follows a **strict minimum viable scope**, focusing on
+searching, querying, and updating anime watch progress.
 
 ---
 
-## 3. Componentes FUERA del Alcance
+## 2. In-Scope Components
 
-| Área del Esquema AniList | Estado | Justificación de exclusión |
-|--------------------------|--------|----------------------------|
-| **Foros e Hilos (`Thread`, `Comment`)** | **Excluido** | Irrelevante para sincronización de progreso de vídeo. |
-| **Feed Social y Mensajería (`Activity`, `Like`, `Follow`)** | **Excluido** | aniSync es un daemon desatendido; no consume redes sociales. |
-| **Reseñas y Recomendaciones (`Review`, `Recommendation`)** | **Excluido** | Alto coste de tipos sin aplicación práctica en el matching. |
-| **Personajes, Actores de Voz y Staff (`Character`, `Staff`)** | **Excluido** | Voluminoso y sin uso en el procesamiento de webhooks de Plex. |
-| **Notificaciones (`Notification`)** | **Excluido** | No interviene en la sincronización. |
-| **Manga y Novelas Ligeras (Lectura/Tracking)** | **Diferido** | aniSync se enfoca en vídeo de Plex. Los enums de soporte base (`MediaType`) se incluyen para no bloquear el futuro, pero no se implementan servicios específicos de manga en esta fase. |
-| **Mutaciones administrativas (`UpdateUser`, `Mod*`)** | **Excluido** | La gestión de cuenta y moderación se realiza desde la interfaz web de AniList. |
+| Component / Service | Methods & Entities | Technical Justification in aniSync |
+|---------------------|--------------------|-----------------------------------|
+| **Auth / OAuth2** | `AuthorizeURL`, `ExchangeCode`, `RefreshToken` | Enables linking user AniList accounts persistently and unattended. |
+| **User (`UserService`)** | `CurrentUser(ctx)`, `GetByID(ctx, id)` | Identifies the authenticated user, numeric ID, and rating scale (`ScoreFormat`). |
+| **Media (`MediaService`)** | `GetByID(ctx, id)`, `GetByIDMal(ctx, idMal)`, `Search(ctx, query, opts...)` | Matches Plex titles (Romaji, English, Native) and cross-references MyAnimeList IDs. |
+| **MediaList (`MediaListService`)** | `GetEntry(ctx, userID, mediaID)`, `GetCollection(ctx, userID, opts...)`, `SaveEntry(ctx, input)`, `DeleteEntry(ctx, id)` | Core scrobbling: checks watch status, mutates episode progress and completion (`CURRENT`, `COMPLETED`). |
+| **Transport & Quotas** | `doGraphQL`, `X-RateLimit-*` headers, HTTP 429 handling | Guarantees compliance with AniList's 90 req/min quota and reports rate limits to caller. |
+
+---
+
+## 3. Out-of-Scope Components
+
+| Schema Area | Status | Reason for Exclusion |
+|-------------|:------:|----------------------|
+| **Forums & Threads (`Thread`, `Comment`)** | **Excluded** | Irrelevant for video watch progress sync. |
+| **Social Feed (`Activity`, `Like`, `Follow`)** | **Excluded** | aniSync is an unattended daemon; does not consume social features. |
+| **Reviews & Recommendations (`Review`)** | **Excluded** | High type overhead with zero utility in media matching. |
+| **Characters & Staff (`Character`, `Staff`)** | **Excluded** | Large relational payload unused in scrobbling. |
+| **System Notifications (`Notification`)** | **Excluded** | Does not participate in synchronization. |
+| **Manga / Light Novels (Reading Lists)** | **Deferred** | aniSync focuses on video streams. Base enums (`MediaType`) are provided for future extension. |
+| **Administrative Mutations (`UpdateUser`)** | **Excluded** | Account configuration is managed via the AniList web interface. |

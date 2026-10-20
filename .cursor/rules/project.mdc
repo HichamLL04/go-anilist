@@ -1,0 +1,14 @@
+﻿---
+description: go-anilist project coding guidelines and rules
+globs: **/*
+---
+
+Refer to [AGENTS.md](../../AGENTS.md) as the SINGLE SOURCE OF TRUTH for all rules and standards.
+
+Key constraints:
+- Pure Go library for AniList GraphQL API.
+- Do not import aniSync or external application logic.
+- Follow Conventional Commits format for git operations.
+- Ensure all public functions accept `context.Context`.
+- Wrap errors with `fmt.Errorf("...: %w", err)`.
+- Use `net/http/httptest` for all network tests.

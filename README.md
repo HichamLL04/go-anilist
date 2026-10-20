@@ -1,11 +1,118 @@
-﻿# go-anilist
+# go-anilist
 
-Librería cliente Go para la API GraphQL de AniList (v2), diseñada con foco en rendimiento, bajo consumo de memoria y cero dependencias pesadas.
+[![Go Reference](https://pkg.go.dev/badge/github.com/hichamll04/go-anilist.svg)](https://pkg.go.dev/github.com/hichamll04/go-anilist)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Creada para integrarse de forma desacoplada con **aniSync** y cualquier herramienta Go que necesite sincronizar o gestionar listas de anime y manga.
+Librería cliente Go ligera e independiente para la API GraphQL (v2) de [AniList](https://anilist.co).
+Diseñada con **cero dependencias externas** (solo biblioteca estándar de Go), decodificación por streaming y estricta eficiencia de memoria para aplicaciones de sincronización y daemons.
 
-## Estado del proyecto
+---
 
-Fase de diseño y especificación arquitectónica (Fase 0). Sin código Go implementado todavía.
+## Características
 
-Para consultar las directrices y decisiones de diseño, ver [`docs/`](docs/).
+- **Zero External Dependencies**: Desarrollada exclusivamente sobre la biblioteca estándar de Go (`net/http`, `encoding/json`, `context`).
+- **Streaming JSON**: Deserialización directa sin buffering acumulativo redundante.
+- **Rate Limit Aware**: Inspección automática de cabeceras `X-RateLimit-*` y gestión nativa de respuestas `429 Too Many Requests` (`Retry-After`).
+- **Servicios Modulares**:
+  - `User`: Perfil autenticado (`Viewer`) y configuraciones de listas (`ScoreFormat`).
+  - `Media`: Búsqueda de anime y resolución por ID AniList / ID MyAnimeList.
+  - `MediaList`: Consulta de progreso de visualización, colecciones y actualización (`SaveEntry`).
+  - `Auth`: Flujo de autorización OAuth2 (`AuthorizeURL`, `ExchangeCode`, `RefreshToken`).
+- **100% Determinista en Tests**: Suite de pruebas sin tráfico de red real mediante `net/http/httptest`.
+
+---
+
+## Instalación
+
+```bash
+go get github.com/hichamll04/go-anilist
+```
+
+---
+
+## Ejemplos de Uso
+
+### 1. Inicialización del Cliente
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/hichamll04/go-anilist"
+)
+
+func main() {
+    // Inicializar cliente con token Bearer
+    client := anilist.NewClient(nil, anilist.WithToken("tu_access_token_aqui"))
+
+    // Obtener información del usuario autenticado
+    user, resp, err := client.User.CurrentUser(context.Background())
+    if err != nil {
+        log.Fatalf("Error obteniendo usuario: %v", err)
+    }
+
+    fmt.Printf("Usuario: %s (ID: %d)\n", user.Name, user.ID)
+    fmt.Printf("Cuota restante: %d peticiones\n", resp.RateLimit.Remaining)
+}
+```
+
+### 2. Búsqueda de Anime
+
+```go
+results, _, err := client.Media.Search(
+    ctx,
+    "Sousou no Frieren",
+    anilist.WithFormat(anilist.MediaFormatTV),
+    anilist.WithSeasonYear(2023),
+    anilist.WithLimit(5),
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, anime := range results {
+    fmt.Printf("[%d] %s - %d episodios\n", anime.ID, anime.Title.Romaji, *anime.Episodes)
+}
+```
+
+### 3. Actualizar Progreso de Visualización
+
+```go
+progress := 16
+status := anilist.MediaListStatusCurrent
+score := 9.5
+
+entry, _, err := client.MediaList.SaveEntry(ctx, anilist.SaveMediaListEntryInput{
+    MediaID:  154587,
+    Progress: &progress,
+    Status:   &status,
+    Score:    &score,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Actualizado anime %d al episodio %d (estado: %s)\n", entry.MediaID, entry.Progress, entry.Status)
+```
+
+### 4. Manejo Estructurado de Errores
+
+```go
+if errors.Is(err, anilist.ErrNotFound) {
+    fmt.Println("El recurso no existe en AniList")
+} else if errors.Is(err, anilist.ErrRateLimited) {
+    fmt.Println("Límite de peticiones excedido (429)")
+} else if errors.Is(err, anilist.ErrUnauthorized) {
+    fmt.Println("Token inválido o expirado")
+}
+```
+
+---
+
+## Licencia
+
+Distribuido bajo la [Licencia MIT](LICENSE).

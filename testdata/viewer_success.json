@@ -1,0 +1,15 @@
+{
+  "data": {
+    "Viewer": {
+      "id": 98765,
+      "name": "Hicham",
+      "avatar": {
+        "large": "https://s4.anilist.co/file/anilistcdn/user/avatar/large/default.png",
+        "medium": "https://s4.anilist.co/file/anilistcdn/user/avatar/medium/default.png"
+      },
+      "mediaListOptions": {
+        "scoreFormat": "POINT_100"
+      }
+    }
+  }
+}

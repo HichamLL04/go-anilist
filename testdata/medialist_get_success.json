@@ -1,0 +1,22 @@
+{
+  "data": {
+    "MediaList": {
+      "id": 12345678,
+      "mediaId": 154587,
+      "status": "CURRENT",
+      "progress": 14,
+      "score": 9.5,
+      "repeat": 0,
+      "updatedAt": 1700005000,
+      "media": {
+        "id": 154587,
+        "idMal": 52991,
+        "title": {
+          "romaji": "Sousou no Frieren",
+          "english": "Frieren: Beyond Journey's End"
+        },
+        "episodes": 28
+      }
+    }
+  }
+}

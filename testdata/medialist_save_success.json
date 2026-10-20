@@ -1,0 +1,13 @@
+{
+  "data": {
+    "SaveMediaListEntry": {
+      "id": 12345678,
+      "mediaId": 154587,
+      "status": "CURRENT",
+      "progress": 15,
+      "score": 10.0,
+      "repeat": 0,
+      "updatedAt": 1700010000
+    }
+  }
+}

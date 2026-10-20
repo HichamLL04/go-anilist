@@ -46,6 +46,6 @@ La automatización de releases deriva directamente del historial de Git bajo Con
 - Los tags de Git deben llevar el prefijo `v` (ej. `v0.1.0`, `v0.1.1`).
 - En `go.mod`, la ruta del módulo se mantendrá canónica:
   ```go
-  module github.com/morluto/go-anilist // o la organización final
+  module github.com/hichamll04/go-anilist // o la organización final
   ```
 - Al avanzar a versiones mayores (`v2+`), se adoptará la convención de sufijo de módulo de Go (`/v2`).

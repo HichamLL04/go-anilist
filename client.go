@@ -1,4 +1,4 @@
-﻿package anilist
+package anilist
 
 import (
 	"net/http"
@@ -20,6 +20,8 @@ const (
 type Client struct {
 	client    *http.Client
 	baseURL   string
+	authURL   string
+	tokenURL  string
 	token     string
 	userAgent string
 
@@ -62,6 +64,8 @@ func NewClient(httpClient *http.Client, opts ...ClientOption) *Client {
 	c := &Client{
 		client:    httpClient,
 		baseURL:   DefaultBaseURL,
+		authURL:   DefaultAuthURL,
+		tokenURL:  DefaultTokenURL,
 		userAgent: DefaultUserAgent,
 	}
 

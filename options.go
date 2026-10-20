@@ -1,4 +1,4 @@
-﻿package anilist
+package anilist
 
 // ClientOption configures a Client.
 type ClientOption func(*Client)
@@ -8,6 +8,20 @@ type ClientOption func(*Client)
 func WithBaseURL(rawURL string) ClientOption {
 	return func(c *Client) {
 		c.baseURL = rawURL
+	}
+}
+
+// WithAuthURL overrides the default OAuth2 authorization endpoint URL.
+func WithAuthURL(authURL string) ClientOption {
+	return func(c *Client) {
+		c.authURL = authURL
+	}
+}
+
+// WithTokenURL overrides the default OAuth2 token endpoint URL (useful for testing).
+func WithTokenURL(tokenURL string) ClientOption {
+	return func(c *Client) {
+		c.tokenURL = tokenURL
 	}
 }
 

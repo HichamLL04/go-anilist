@@ -1,6 +1,7 @@
 # go-anilist
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/hichamll04/go-anilist.svg)](https://pkg.go.dev/github.com/hichamll04/go-anilist)
+[![CI](https://github.com/hichamll04/go-anilist/actions/workflows/ci.yml/badge.svg)](https://github.com/hichamll04/go-anilist/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Librería cliente Go ligera e independiente para la API GraphQL (v2) de [AniList](https://anilist.co).
@@ -110,6 +111,14 @@ if errors.Is(err, anilist.ErrNotFound) {
     fmt.Println("Token inválido o expirado")
 }
 ```
+
+---
+
+## Agradecimientos y Atribución
+
+La arquitectura de este cliente (patrón de sub-servicios `Client.Service`, inyección limpia de `*http.Client`, opciones funcionales y estrategia de testing determinista con `httptest.Server`) está inspirada en la excelente librería [`go-myanimelist`](https://github.com/nstratos/go-myanimelist) desarrollada por **Stratos Neiros** (licencia MIT). 
+
+`go-anilist` adapta dichos principios al protocolo GraphQL v2 de AniList, manteniendo total compatibilidad idiomática en Go y cero dependencias externas.
 
 ---
 
